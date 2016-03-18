@@ -9,3 +9,11 @@ The grammar notation and parameters can be found [here](http://www.hwaci.com/sw/
 * This class is named LPParse or LP + the prefix you set with the %name directive (check original Lemon [documentation](http://www.hwaci.com/sw/lemon/lemon.html)).
 
 A self-explanotary example is included with the source.
+
+###### New directive
+%include_hpp allows adding code on top of the generated header file; if tokens use types defines in an include file its inclusion must be added here too
+
+###### Updates
+* 2016/03/18 Added %include_hpp directive
+* 2016/03/04 Created LemonCpp project
+
