@@ -381,7 +381,8 @@ struct lemon {
   char *vartype;           /* The default type of non-terminal symbols */
   char *start;             /* Name of the start symbol for the grammar */
   char *stacksize;         /* Size of the parser stack */
-  char *include;           /* Code to put at the start of the C file */
+  char *include;           /* Code to put at the start of the CPP file */
+  char *include_hpp;           /* Code to put at the start of the HPP file */
   char *error;             /* Code to execute when an error is seen */
   char *overflow;          /* Code to execute on a stack overflow */
   char *failure;           /* Code to execute on parser failure */
@@ -2315,6 +2316,7 @@ to follow the previous rule.");
         psp->state = RESYNC_AFTER_RULE_ERROR;
       }
       break;
+	  /* NMS check %rule (%include, %name, etc..) and act */
     case WAITING_FOR_DECL_KEYWORD:
       if( isalpha(x[0]) ){
         psp->declkeyword = x;
@@ -2322,12 +2324,22 @@ to follow the previous rule.");
         psp->decllinenoslot = 0;
         psp->insertLineMacro = 1;
         psp->state = WAITING_FOR_DECL_ARG;
-        if( strcmp(x,"name")==0 ){
-          psp->declargslot = &(psp->gp->name);
-          psp->insertLineMacro = 0;
-        }else if( strcmp(x,"include")==0 ){
+		
+        if( strcmp(x,"name")==0 )
+		{
+			psp->declargslot = &(psp->gp->name);
+			psp->insertLineMacro = 0;
+        }
+		else if( strcmp(x,"include")==0 )
+		{
           psp->declargslot = &(psp->gp->include);
-        }else if( strcmp(x,"code")==0 ){
+        }
+		/* NMS added to allow inserting some extra code in the hpp */
+		else if( strcmp(x,"include_hpp")==0 )
+		{
+          psp->declargslot = &(psp->gp->include_hpp);
+        }
+		else if( strcmp(x,"code")==0 ){
           psp->declargslot = &(psp->gp->extracode);
         }else if( strcmp(x,"token_destructor")==0 ){
           psp->declargslot = &psp->gp->tokendest;
@@ -2453,13 +2465,15 @@ to follow the previous rule.");
       }
       break;
     case WAITING_FOR_DECL_ARG:
-      if( x[0]=='{' || x[0]=='\"' || isalnum(x[0]) ){
+      if( x[0]=='{' || x[0]=='\"' || isalnum(x[0]) )
+	  {
         const char *zOld, *zNew;
         char *zBuf, *z;
         int nOld, n, nLine = 0, nNew, nBack;
         int addLineMacro;
         char zLine[50];
         zNew = x;
+		
         if( zNew[0]=='"' || zNew[0]=='{' ) zNew++;
         nNew = lemonStrlen(zNew);
         if( *psp->declargslot ){
@@ -3782,6 +3796,7 @@ void ReportTable(
 
   /* Generate the include code, if any */
   tplt_print(out,lemp,lemp->include,&lineno);
+  
   if( 1 ){		/* NMS - it was if(mhflag) */
     incName = file_makename(lemp, ".hpp");
     fprintf(out,"#include \"%s\"\n", incName); 
@@ -4239,6 +4254,14 @@ void ReportHeader(struct lemon *lemp)
     }
   }
   out = file_open(lemp,".hpp","wb");
+  
+  /* NMS print hpp header */
+  if(lemp->include_hpp)
+  {
+	fprintf(out, "%s\n", lemp->include_hpp);
+	//tplt_linedir(out,*lineno,lemp->outname);
+  }
+  
   if( out )
   {
     for(i=1; i<lemp->nterminal; i++){
@@ -5100,28 +5123,6 @@ void Configtable_clear(int(*f)(struct config *))
   return;
 }
 
-/* check if there are not allowed characters in the class name; return the offset */
-static int classNameStart(char *className)
-{
-	int i;
-	
-	/* check that the class name does not containt wrong characters */
-	for(i = strlen(className)-1; i > -1; i--)
-	{
-		if(	className[i] == '\\' || 
-			className[i] == '/' ||
-			className[i] == '.' )
-		{
-			i++;
-			break;
-		}
-	}
-	
-	/* if it stopped before end add it back */
-	if( i > -1)
-		return i;
-	else return 0;
-}
 
 /* Added by NMS */
 /* Print class header */
@@ -5180,7 +5181,7 @@ static void printClassBody(FILE* sourceFile, struct lemon *lemp, int *lineno)
 	fprintf(sourceFile, "\n");
 	
 	/* destructor */
-	fprintf(sourceFile, "%s%s::~%s%s()\n",LEMON_CLASS_PREFIX,className,LEMON_CLASS_PREFIX,className);
+	fprintf(sourceFile, "%s%s::~%s%s()\n", LEMON_CLASS_PREFIX, className, LEMON_CLASS_PREFIX, className);
 	fprintf(sourceFile, "{\n");
 		fprintf(sourceFile, "\t%sFree(this->parser, free);\n", name);
 	fprintf(sourceFile, "}\n");
@@ -5195,7 +5196,7 @@ static void printClassBody(FILE* sourceFile, struct lemon *lemp, int *lineno)
 	fprintf(sourceFile, "*/\n");
 	
 	/*parse*/
-	fprintf(sourceFile, "void %s%s::parse(int token, %sTOKENTYPE tokenValue %sARG_PDECL)\n",LEMON_CLASS_PREFIX,className, name, name);
+	fprintf(sourceFile, "void %s%s::parse(int token, %sTOKENTYPE tokenValue %sARG_PDECL)\n", LEMON_CLASS_PREFIX, className, name, name);
 	fprintf(sourceFile, "{\n");
 		fprintf(sourceFile, "#ifdef %sARG_NAME\n", name);
 			fprintf(sourceFile, "\t%s(this->parser, token, tokenValue, %sARG_NAME);\n", name, name);
@@ -5206,7 +5207,7 @@ static void printClassBody(FILE* sourceFile, struct lemon *lemp, int *lineno)
 	fprintf(sourceFile, "\n");
 	
 	/* stackPeak() */
-	fprintf(sourceFile, "int %s%s::stackPeak()\n",LEMON_CLASS_PREFIX,className);
+	fprintf(sourceFile, "int %s%s::stackPeak()\n", LEMON_CLASS_PREFIX, className);
 	fprintf(sourceFile, "{\n");
 		fprintf(sourceFile, "#ifdef YYTRACKMAXSTACKDEPTH\n");
 			fprintf(sourceFile, "\treturn %sStackPeak(this->parser);\n", name);
@@ -5218,7 +5219,7 @@ static void printClassBody(FILE* sourceFile, struct lemon *lemp, int *lineno)
 	fprintf(sourceFile, "\n");
 	
 	/* trace() */
-	fprintf(sourceFile, "void %s%s::trace(FILE *TraceFILE, char *zTracePrompt)\n",LEMON_CLASS_PREFIX,className);
+	fprintf(sourceFile, "void %s%s::trace(FILE *TraceFILE, char *zTracePrompt)\n", LEMON_CLASS_PREFIX, className);
 	fprintf(sourceFile, "{\n");
 		fprintf(sourceFile, "\t%sTrace(TraceFILE, zTracePrompt);\n", name);
 	fprintf(sourceFile, "}\n");
