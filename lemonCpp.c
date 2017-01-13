@@ -5219,10 +5219,12 @@ static void printClassBody(FILE* sourceFile, struct lemon *lemp, int *lineno)
 	fprintf(sourceFile, "\n");
 	
 	/* trace() */
-	fprintf(sourceFile, "void %s%s::trace(FILE *TraceFILE, char *zTracePrompt)\n", LEMON_CLASS_PREFIX, className);
-	fprintf(sourceFile, "{\n");
-		fprintf(sourceFile, "\t%sTrace(TraceFILE, zTracePrompt);\n", name);
-	fprintf(sourceFile, "}\n");
+  fprintf(sourceFile, "#ifndef NDEBUG\n");
+  	fprintf(sourceFile, "void %s%s::trace(FILE *TraceFILE, char *zTracePrompt)\n", LEMON_CLASS_PREFIX, className);
+  	fprintf(sourceFile, "{\n");
+  		fprintf(sourceFile, "\t%sTrace(TraceFILE, zTracePrompt);\n", name);
+  	fprintf(sourceFile, "}\n");
+    fprintf(sourceFile, "#endif\n");
 	
 	fprintf(sourceFile, "\n");
 
