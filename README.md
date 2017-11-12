@@ -21,5 +21,5 @@ A self-explanotary example is included with the source.
 * 2016/03/18 Added %include_hpp directive
 * 2016/03/04 Created LemonCpp project
 * 2017/01/13 Fixed ParseTrace issue when compiling as "Release"
-* 2017/11/12 Extracted CPP code skelethons from lemonCpp.c; -t option added; added <extra parameter> as class attribute
+* 2017/11/12 Extracted CPP code skelethons from lemonCpp.c; -t option added; added [extra parameter] as class attribute
 
