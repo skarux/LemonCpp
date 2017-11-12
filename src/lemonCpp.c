@@ -52,11 +52,15 @@ static char *msort(char*,char**,int(*)(const char*,const char*));
 */
 #define lemonStrlen(X)   ((int)strlen(X))
 
-/* NMS: define an output class name prefix LemonParser*/
-#define LEMON_CLASS_PREFIX "LP"
+/* NMS: define a default output class name prefix for LemonParser*/
+#define LEMON_CLASS_PREFIX "Lp"
 
 /* NMS: if no %name is specified this prefix will be used as default for all functions and #define */ 
 #define DEF_GEN_PREFIX "Parse"
+
+/* NMS: default template file names */
+#define FILE_CLASS_H_TMPL_NAME 		"OutputClassH.cpp"
+#define FILE_CLASS_CPP_TMPL_NAME 	"OutputClassCPP.cpp"
 
 /*
 ** Compilers are starting to complain about the use of sprintf() and strcpy(),
@@ -81,15 +85,34 @@ static void lemon_addtext(
   const char *zIn,      /* Text to add */
   int nIn,              /* Bytes of text to add.  -1 to use strlen() */
   int iWidth            /* Field width.  Negative to left justify */
-){
-  if( nIn<0 ) for(nIn=0; zIn[nIn]; nIn++){}
-  while( iWidth>nIn ){ zBuf[(*pnUsed)++] = ' '; iWidth--; }
-  if( nIn==0 ) return;
+)
+{
+  if( nIn<0 )
+	  for(nIn=0; zIn[nIn]; nIn++)
+	  {
+
+	  }
+
+  while( iWidth>nIn )
+  {
+	  zBuf[(*pnUsed)++] = ' ';
+	  iWidth--;
+  }
+
+  if( nIn==0 )
+	  return;
+
   memcpy(&zBuf[*pnUsed], zIn, nIn);
   *pnUsed += nIn;
-  while( (-iWidth)>nIn ){ zBuf[(*pnUsed)++] = ' '; iWidth++; }
+  while( (-iWidth)>nIn )
+  {
+	  zBuf[(*pnUsed)++] = ' ';
+	  iWidth++;
+  }
   zBuf[*pnUsed] = 0;
 }
+
+
 static int lemon_vsprintf(char *str, const char *zFormat, va_list ap){
   int i, j, k, c;
   int nUsed = 0;
@@ -382,7 +405,7 @@ struct lemon {
   char *start;             /* Name of the start symbol for the grammar */
   char *stacksize;         /* Size of the parser stack */
   char *include;           /* Code to put at the start of the CPP file */
-  char *include_hpp;           /* Code to put at the start of the HPP file */
+  char *include_hpp;       /* Code to put at the start of the HPP file */
   char *error;             /* Code to execute when an error is seen */
   char *overflow;          /* Code to execute on a stack overflow */
   char *failure;           /* Code to execute on parser failure */
@@ -398,6 +421,7 @@ struct lemon {
   int basisflag;           /* Print only basis configurations */
   int has_fallback;        /* True if any %fallback is seen in the grammar */
   int nolinenosflag;       /* True if #line statements should not be printed */
+  char *classPrefix;	   /* Class prefix */
   char *argv0;             /* Name of the program */
 };
 
@@ -1487,14 +1511,34 @@ static void handle_D_option(char *z){
   *z = 0;
 }
 
+/***************************************************************************/
+
 static char *user_templatename = NULL;
-static void handle_T_option(char *z){
+static void handle_T_option(char *z)
+{
   user_templatename = (char *) malloc( lemonStrlen(z)+1 );
-  if( user_templatename==0 ){
+  if( user_templatename==0 )
+  {
     memory_error();
   }
   lemon_strcpy(user_templatename, z);
 }
+
+/***************************************************************************/
+
+static char *user_templatepath = NULL;
+static void handle_t_option(char *z)
+{
+	user_templatepath = (char *) malloc( lemonStrlen(z)+1 );
+  if( user_templatepath==0 )
+  {
+    memory_error();
+  }
+
+  lemon_strcpy(user_templatepath, z);
+}
+
+/***************************************************************************/
 
 /* The main program.  Parse the command line and do it... */
 int main(int argc, char **argv)
@@ -1526,6 +1570,7 @@ int main(int argc, char **argv)
                                    "Print parser stats to standard output."},
     {OPT_FLAG, "x", (char*)&version, "Print the version number."},
     {OPT_FSTR, "T", (char*)handle_T_option, "Specify a template file."},
+	{OPT_FSTR, "t", (char*)handle_t_option, "Specify the CPP class template files path"},
     {OPT_FSTR, "W", 0, "Ignored.  (Placeholder for '-W' compiler options.)"},
     {OPT_FLAG,0,0,0}
   };
@@ -1579,9 +1624,12 @@ int main(int argc, char **argv)
   lem.nterminal = i;
 
   /* Generate a reprint of the grammar, if requested on the command line */
-  if( rpflag ){
+  if( rpflag )
+  {
     Reprint(&lem);
-  }else{
+  }
+  else
+  {
     /* Initialize the size for all follow and first sets */
     SetSize(lem.nterminal+1);
 
@@ -1626,13 +1674,16 @@ int main(int argc, char **argv)
     ** generate the file for us.) */
     if( !mhflag ) ReportHeader(&lem);
   }
-  if( statistics ){
+  if( statistics )
+  {
     printf("Parser statistics: %d terminals, %d nonterminals, %d rules\n",
       lem.nterminal, lem.nsymbol - lem.nterminal, lem.nrule);
     printf("                   %d states, %d parser table entries, %d conflicts\n",
       lem.nstate, lem.tablesize, lem.nconflict);
   }
-  if( lem.nconflict > 0 ){
+
+  if( lem.nconflict > 0 )
+  {
     fprintf(stderr,"%d parsing conflicts.\n",lem.nconflict);
   }
 
@@ -2330,6 +2381,12 @@ to follow the previous rule.");
 			psp->declargslot = &(psp->gp->name);
 			psp->insertLineMacro = 0;
         }
+        /* NMS it defines the class name prefix */
+        else if( strcmp(x,"name_prefix")==0 )
+		{
+		  psp->declargslot = &(psp->gp->classPrefix);
+		  psp->insertLineMacro = 0;
+		}
 		else if( strcmp(x,"include")==0 )
 		{
           psp->declargslot = &(psp->gp->include);
@@ -2809,6 +2866,13 @@ void Parse(struct lemon *gp)
   free(filebuf);                    /* Release the buffer after parsing */
   gp->rule = ps.firstrule;
   gp->errorcnt = ps.errorcnt;
+
+  /* if no class prefix has been set force the default */
+  if(gp->classPrefix == NULL)
+  {
+	  gp->classPrefix = (char*)malloc(sizeof(char)*(strlen(LEMON_CLASS_PREFIX)+1));
+	  strcpy(gp->classPrefix, LEMON_CLASS_PREFIX);
+  }
 }
 /*************************** From the file "plink.c" *********************/
 /*
@@ -3214,28 +3278,50 @@ PRIVATE int compute_action(struct lemon *lemp, struct action *ap)
 ** if name!=0, then any word that begin with "Parse" is changed to
 ** begin with *name instead.
 */
-PRIVATE void tplt_xfer(char *name, FILE *in, FILE *out, int *lineno)
+PRIVATE void tplt_xfer(char *name, char *prefix, FILE *in, FILE *out, int *lineno)
 {
   int i, iStart;
   char line[LINESIZE];
-  while( fgets(line,LINESIZE,in) && (line[0]!='%' || line[1]!='%') ){
+  while( fgets(line,LINESIZE,in) && (line[0]!='%' || line[1]!='%') )
+  {
     (*lineno)++;
     iStart = 0;
-    if( name ){
-      for(i=0; line[i]; i++){
-        if( line[i]=='P' && strncmp(&line[i],"Parse",5)==0
-          && (i==0 || !isalpha(line[i-1]))
-        ){
-          if( i>iStart ) fprintf(out,"%.*s",i-iStart,&line[iStart]);
-          fprintf(out,"%s",name);
+    if( name )
+    {
+      for(i=0; line[i]; i++)
+      {
+    	/* if there is a dollar substitute it with the class prefix */
+    	if( (line[i] == '$')  )
+    	{
+    		if( i>iStart )
+    		{
+    			fprintf(out,"%.*s",i-iStart,&line[iStart]);
+    		}
+    		fprintf(out,"%s", prefix);
+    		iStart = i+1;
+    		continue;
+    	}
+
+        if( ( line[i] == 'P' 					) &&
+        	( strncmp(&line[i],"Parse",5) == 0 	) &&
+			( (i == 0) || !isalpha(line[i-1])	)
+          )
+        {
+          if( i>iStart )
+          {
+        	  fprintf(out,"%.*s",i-iStart,&line[iStart]);
+          }
+          fprintf(out,"%s", name);
           i += 4;
           iStart = i+1;
         }
       }
     }
+
     fprintf(out,"%s",&line[iStart]);
   }
 }
+
 
 /* The next function finds the template file and opens it, returning
 ** a pointer to the opened file. */
@@ -3785,14 +3871,15 @@ void ReportTable(
   char *incName;
 
   in = tplt_open(lemp);
-  if( in==0 ) return;
+  if( in == 0 ) return;
   out = file_open(lemp,".cpp","wb");
-  if( out==0 ){
+  if( out== 0 )
+  {
     fclose(in);
     return;
   }
   lineno = 1;
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix, in, out, &lineno);
 
   /* Generate the include code, if any */
   tplt_print(out,lemp,lemp->include,&lineno);
@@ -3803,7 +3890,7 @@ void ReportTable(
 	lineno++;
 	free(incName);
   }
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate #defines for all tokens */
   if( mhflag ){
@@ -3817,7 +3904,7 @@ void ReportTable(
     }
     fprintf(out,"#endif\n"); lineno++;
   }
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate the defines */
   fprintf(out,"#define YYCODETYPE %s\n",
@@ -3843,29 +3930,36 @@ void ReportTable(
   name = lemp->name ? lemp->name : DEF_GEN_PREFIX;
   if( lemp->arg && lemp->arg[0] )
   {
-	char* tmpParam;
+	char* tmpParam, tmpArrParam[LINESIZE];
     i = lemonStrlen(lemp->arg);
     while( i>=1 && isspace(lemp->arg[i-1]) ) i--;
     while( i>=1 && (isalnum(lemp->arg[i-1]) || lemp->arg[i-1]=='_') ) i--;
     fprintf(out,"#define %sARG_SDECL %s;\n",name,lemp->arg);  lineno++;
+    fprintf(out,"#define %sARG_SPDECL %s\n",name,lemp->arg);  lineno++;
     fprintf(out,"#define %sARG_PDECL ,%s\n",name,lemp->arg);  
-	sprintf(headerTopBuf + strlen(headerTopBuf),"#define %sARG_PDECL ,%s\n",name,lemp->arg); /* NMS */ 
+	sprintf(headerTopBuf,"%s#define %sARG_PDECL ,%s\n",headerTopBuf,name,lemp->arg); /* NMS */
+	sprintf(headerTopBuf,"%s#define %sARG_SPDECL %s\n",headerTopBuf,name,lemp->arg); /* NMS */
 	/* [NMS] make a new define to know what to call by the parsing class*/
 		tmpParam = trimwhitespace(lemp->arg);
 		tmpParam = tmpParam + strlen(tmpParam)-1;
 		while((*tmpParam) != ' ') tmpParam--;
 		tmpParam++;
 		fprintf(out,"#define %sARG_NAME %s\n",name,tmpParam);
+		strcpy(tmpArrParam, trimwhitespace(lemp->arg));
+		tmpArrParam[tmpParam - trimwhitespace(lemp->arg) - 1] = 0;
+		fprintf(out,"#define %sARG_TYPE %s\n",name,tmpArrParam);
 	/* [NMS] end */
 	lineno++;
     fprintf(out,"#define %sARG_FETCH %s = yypParser->%s\n",
                  name,lemp->arg,&lemp->arg[i]);  lineno++;
     fprintf(out,"#define %sARG_STORE yypParser->%s = %s\n",
                  name,&lemp->arg[i],&lemp->arg[i]);  lineno++;
-  }else{
+  }
+  else
+  {
     fprintf(out,"#define %sARG_SDECL\n",name);  lineno++;
-    fprintf(out,"#define %sARG_PDECL\n",name);  
-	sprintf(headerTopBuf + strlen(headerTopBuf),"#define %sARG_PDECL\n",name); /* NMS */ 
+    fprintf(out,"#define %sARG_PDECL\n",name);
+	sprintf(headerTopBuf + strlen(headerTopBuf),"#define %sARG_PDECL\n",name); /* NMS */
 	lineno++;
     fprintf(out,"#define %sARG_FETCH\n",name); lineno++;
     fprintf(out,"#define %sARG_STORE\n",name); lineno++;
@@ -3882,7 +3976,7 @@ void ReportTable(
   if( lemp->has_fallback ){
     fprintf(out,"#define YYFALLBACK 1\n");  lineno++;
   }
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate the action table and its associates:
   **
@@ -4049,7 +4143,7 @@ void ReportTable(
     }
   }
   fprintf(out, "};\n"); lineno++;
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate the table of fallback tokens.
   */
@@ -4067,7 +4161,7 @@ void ReportTable(
       lineno++;
     }
   }
-  tplt_xfer(lemp->name, in, out, &lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix, in, out, &lineno);
 
   /* Generate a table containing the symbolic name of every symbol
   */
@@ -4077,7 +4171,7 @@ void ReportTable(
     if( (i&3)==3 ){ fprintf(out,"\n"); lineno++; }
   }
   if( (i&3)!=0 ){ fprintf(out,"\n"); lineno++; }
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate a table containing a text string that describes every
   ** rule in the rule set of the grammar.  This information is used
@@ -4089,7 +4183,7 @@ void ReportTable(
     writeRuleText(out, rp);
     fprintf(out,"\",\n"); lineno++;
   }
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate code which executes every time a symbol is popped from
   ** the stack while processing errors or while destroying the parser. 
@@ -4151,11 +4245,11 @@ void ReportTable(
     emit_destructor_code(out,lemp->symbols[i],lemp,&lineno);
     fprintf(out,"      break;\n"); lineno++;
   }
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate code which executes whenever the parser stack overflows */
   tplt_print(out,lemp,lemp->overflow,&lineno);
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate the table of rule information 
   **
@@ -4165,7 +4259,7 @@ void ReportTable(
   for(rp=lemp->rule; rp; rp=rp->next){
     fprintf(out,"  { %d, %d },\n",rp->lhs->index,rp->nrhs); lineno++;
   }
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate code which execution during each REDUCE action */
   for(rp=lemp->rule; rp; rp=rp->next){
@@ -4202,19 +4296,19 @@ void ReportTable(
     fprintf(out, " */ yytestcase(yyruleno==%d);\n", rp->index); lineno++;
   }
   fprintf(out,"        break;\n"); lineno++;
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate code which executes if a parse fails */
   tplt_print(out,lemp,lemp->failure,&lineno);
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate code which executes when a syntax error occurs */
   tplt_print(out,lemp,lemp->error,&lineno);
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Generate code which executes when the parser accepts its input */
   tplt_print(out,lemp,lemp->accept,&lineno);
-  tplt_xfer(lemp->name,in,out,&lineno);
+  tplt_xfer(lemp->name, lemp->classPrefix,in,out,&lineno);
 
   /* Append any addition code the user desires */
   tplt_print(out,lemp,lemp->extracode,&lineno);
@@ -4239,20 +4333,26 @@ void ReportHeader(struct lemon *lemp)
   if( lemp->tokenprefix ) prefix = lemp->tokenprefix;
   else                    prefix = "";
   in = file_open(lemp,".h","rb");
-  if( in ){
+  if( in )
+  {
     int nextChar;
-    for(i=1; i<lemp->nterminal && fgets(line,LINESIZE,in); i++){
-      lemon_sprintf(pattern,"const int %s%-30s = %3d;\n",
-                    prefix,lemp->symbols[i]->name,i);
-      if( strcmp(line,pattern) ) break;
+    for(i=1; i<lemp->nterminal && fgets(line,LINESIZE,in); i++)
+    {
+      lemon_sprintf(pattern,"const int %s%-30s = %3d;\n", prefix, lemp->symbols[i]->name, i);
+
+      if( strcmp(line,pattern) )
+    	  break;
     }
     nextChar = fgetc(in);
     fclose(in);
-    if( i==lemp->nterminal && nextChar==EOF ){
+    if( i==lemp->nterminal && nextChar==EOF )
+    {
       /* No change in the file.  Don't rewrite it. */
       return;
     }
   }
+  /*******************************************************/
+
   out = file_open(lemp,".hpp","wb");
   
   /* NMS print hpp header */
@@ -4264,11 +4364,13 @@ void ReportHeader(struct lemon *lemp)
   
   if( out )
   {
-    for(i=1; i<lemp->nterminal; i++){
+	/* list all the terminal symbols */
+	for(i = 1; i < lemp->nterminal; i++)
+    {
       fprintf(out,"const int %s%-30s = %3d;\n",prefix,lemp->symbols[i]->name,i);
     }
 	
-	printClassHeader(out, lemp);
+    printClassHeader(out, lemp);
 	
     fclose(out);  
   }
@@ -5128,106 +5230,45 @@ void Configtable_clear(int(*f)(struct config *))
 /* Print class header */
 static void printClassHeader(FILE* headerFile, struct lemon *lemp)
 {
-	char *name, *className;
+	char *name, tmpStr[500];
+	FILE *tmplFile;
+	int fake = 0;
 	name = lemp->name ? lemp->name : DEF_GEN_PREFIX;
-	className = name;
 
-	fprintf(headerFile,"\n%s\n",headerTopBuf);
-	
-	fprintf(headerFile, "class %s%s\n", LEMON_CLASS_PREFIX, className);
-	fprintf(headerFile, "{\n");
-	
-		fprintf(headerFile, "public:\n");
-			fprintf(headerFile, "\t%s%s();\n",LEMON_CLASS_PREFIX, className);  /* ParseAlloc */
-			fprintf(headerFile, "\t~%s%s();\n",LEMON_CLASS_PREFIX, className); /* ParseFree */
-			
-			fprintf(headerFile, "\t/**\n");
-				fprintf(headerFile, "\t\tParse;\n");
-				fprintf(headerFile, "\t\t@arg token:\t\tan input terminal symbol\n");
-				fprintf(headerFile, "\t\t@arg tokenValue:\tthe associated value \
-									(the type is the one declared in the parser source; \
-									if an object is passed it must be a pointer)\n");
-				fprintf(headerFile, "\t\t@arg %sARG_PDECL:\t\tif an extra structure it is passed \
-									it will be added as 3rd parameter\n", name);
-			fprintf(headerFile, "\t*/\n");
-			
-			fprintf(headerFile, "\tvoid parse(int token, %sTOKENTYPE yyminor %sARG_PDECL);\n", name, name);
-			fprintf(headerFile, "\tint stackPeak();\n");
-			fprintf(headerFile, "\tvoid trace(FILE *TraceFILE, char *zTracePrompt);\n");
-			fprintf(headerFile, "\t\n");
-			
-		fprintf(headerFile, "private:\n");
-			fprintf(headerFile, "\tvoid* parser;\n");
-			fprintf(headerFile, "\t\n");
-	fprintf(headerFile, "};\n");
-	
-	fprintf(headerFile, "\t\n");
-	fprintf(headerFile, "\t\n");
-	
+	sprintf(tmpStr, "%s%s", user_templatepath, FILE_CLASS_H_TMPL_NAME);
+
+	tmplFile = fopen(tmpStr, "r");
+	if(tmplFile)
+	{
+		fprintf(headerFile,"\n%s\n",headerTopBuf);
+		tplt_xfer(name, lemp->classPrefix, tmplFile, headerFile, &fake);
+	} else
+	{
+		fprintf(stderr, "Unable to open the Header template file\n");
+		return;
+	}
 }
 
 /* print class body */
 static void printClassBody(FILE* sourceFile, struct lemon *lemp, int *lineno)
 {	
-	char *name, *className;
+	char *name, tmpStr[500];
+	FILE *tmplFile;
+	int fake = 0;
 	name = lemp->name ? lemp->name : DEF_GEN_PREFIX;
-	className = name;
 
-	/* constructor */
-	fprintf(sourceFile, "%s%s::%s%s()\n", LEMON_CLASS_PREFIX, className, LEMON_CLASS_PREFIX, className);
-	fprintf(sourceFile, "{\n");
-		fprintf(sourceFile, "\tthis->parser = %sAlloc(malloc);\n", name);
-	fprintf(sourceFile, "}\t\n");
-	fprintf(sourceFile, "\n");
-	
-	/* destructor */
-	fprintf(sourceFile, "%s%s::~%s%s()\n", LEMON_CLASS_PREFIX, className, LEMON_CLASS_PREFIX, className);
-	fprintf(sourceFile, "{\n");
-		fprintf(sourceFile, "\t%sFree(this->parser, free);\n", name);
-	fprintf(sourceFile, "}\n");
-	fprintf(sourceFile, "\n");
-	
-	/* Parse() comments */
-	fprintf(sourceFile, "/**\n");
-		fprintf(sourceFile, "\t%s;\n", name);
-		fprintf(sourceFile, "\t@arg token:\t\t\tan input terminal symbol\n");
-		fprintf(sourceFile, "\t@arg tokenValue:\tthe associated value (the type is the one declared in the parser source)\n");
-		fprintf(sourceFile, "\t@arg ARG_PDECL:\t\tif an extra structure it is passed it will be added as 3rd parameter\n");
-	fprintf(sourceFile, "*/\n");
-	
-	/*parse*/
-	fprintf(sourceFile, "void %s%s::parse(int token, %sTOKENTYPE tokenValue %sARG_PDECL)\n", LEMON_CLASS_PREFIX, className, name, name);
-	fprintf(sourceFile, "{\n");
-		fprintf(sourceFile, "#ifdef %sARG_NAME\n", name);
-			fprintf(sourceFile, "\t%s(this->parser, token, tokenValue, %sARG_NAME);\n", name, name);
-		fprintf(sourceFile, "#else\n");
-			fprintf(sourceFile, "\t%s(this->parser, token, tokenValue);\n", name);
-		fprintf(sourceFile, "#endif\n");
-	fprintf(sourceFile, "}\n");
-	fprintf(sourceFile, "\n");
-	
-	/* stackPeak() */
-	fprintf(sourceFile, "int %s%s::stackPeak()\n", LEMON_CLASS_PREFIX, className);
-	fprintf(sourceFile, "{\n");
-		fprintf(sourceFile, "#ifdef YYTRACKMAXSTACKDEPTH\n");
-			fprintf(sourceFile, "\treturn %sStackPeak(this->parser);\n", name);
-		fprintf(sourceFile, "#else\n");
-			fprintf(sourceFile, "\tfprintf(stderr, \"StackPeak not implemented\\n\");\n");
-			fprintf(sourceFile, "\treturn -1;\n");
-		fprintf(sourceFile, "#endif\n");
-	fprintf(sourceFile, "}\n");
-	fprintf(sourceFile, "\n");
-	
-	/* trace() */
-  fprintf(sourceFile, "#ifndef NDEBUG\n");
-  	fprintf(sourceFile, "void %s%s::trace(FILE *TraceFILE, char *zTracePrompt)\n", LEMON_CLASS_PREFIX, className);
-  	fprintf(sourceFile, "{\n");
-  		fprintf(sourceFile, "\t%sTrace(TraceFILE, zTracePrompt);\n", name);
-  	fprintf(sourceFile, "}\n");
-    fprintf(sourceFile, "#endif\n");
-	
-	fprintf(sourceFile, "\n");
+	sprintf(tmpStr, "%s%s", user_templatepath, FILE_CLASS_CPP_TMPL_NAME);
 
+	tmplFile = fopen(tmpStr, "r");
+	if(tmplFile)
+	{
+		fprintf(sourceFile,"\n%s\n",headerTopBuf);
+		tplt_xfer(name, lemp->classPrefix, tmplFile, sourceFile, &fake);
+	} else
+	{
+		fprintf(stderr, "Unable to open the class body template file\n");
+		return;
+	}
 }
 
 

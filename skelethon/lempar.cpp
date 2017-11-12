@@ -265,10 +265,11 @@ static void yyGrowStack(yyParser *p){
 ** A pointer to a parser.  This pointer is used in subsequent calls
 ** to Parse and ParseFree.
 */
-static void *ParseAlloc(void *(*mallocProc)(size_t)){ /* NMS it wasn't static */
+static void *ParseAlloc(void){
   yyParser *pParser;
-  pParser = (yyParser*)(*mallocProc)( (size_t)sizeof(yyParser) );
-  if( pParser ){
+  pParser = new yyParser;
+  if( pParser )
+  {
     pParser->yyidx = -1;
 #ifdef YYTRACKMAXSTACKDEPTH
     pParser->yyidxMax = 0;
@@ -343,21 +344,18 @@ static int yy_pop_parser_stack(yyParser *pParser){
 ** <ul>
 ** <li>  A pointer to the parser.  This should be a pointer
 **       obtained from ParseAlloc.
-** <li>  A pointer to a function used to reclaim memory obtained
-**       from malloc.
 ** </ul>
 */
-static void ParseFree(		/* NMS it wasn't static */
-  void *p,                    /* The parser to be deleted */
-  void (*freeProc)(void*)     /* Function used to reclaim memory */
+static void ParseFree(
+  void *p                    /* The parser to be deleted */
 ){
   yyParser *pParser = (yyParser*)p;
   if( pParser==0 ) return;
   while( pParser->yyidx>=0 ) yy_pop_parser_stack(pParser);
 #if YYSTACKDEPTH<=0
-  free(pParser->yystack);
+  delete pParser->yystack;
 #endif
-  (*freeProc)((void*)pParser);
+  delete pParser;
 }
 
 /*
@@ -848,45 +846,4 @@ static void Parse( /* NMS it wasn't static */
   }while( yymajor!=YYNOCODE && yypParser->yyidx>=0 );
   return;
 }
-
-/*	
-LemonParser::LemonParser()
-{
-	this->parser = ParseAlloc(malloc);
-}	
-
-LemonParser::~LemonParser()
-{
-	ParseFree(this->parser, free);
-}
-
-
-// Parse;
-// @arg token:			an input terminal symbol
-// @arg tokenValue:	the associated value (the type is the one declared in the parser source)
-// @arg ARG_PDECL:		if an extra structure it is passed it will be added as 3rd parameter
-
-void LemonParser::parse(int token, ParseTOKENTYPE tokenValue ParseARG_PDECL)
-{
-#ifdef ARG_NAME
-	Parse(this->parser, token, tokenValue, ARG_NAME);
-#else
-	Parse(this->parser, token, tokenValue);
-#endif
-}
-
-int LemonParser::stackPeak()
-{
-#ifdef YYTRACKMAXSTACKDEPTH
-	return ParseStackPeak(this->parser);
-#else
-	fprintf(stderr, "StackPeak not implemented\n");
-	return -1;
-#endif
-}
-
-void LemonParser::trace(FILE *TraceFILE, char *zTracePrompt)
-{
-	ParseTrace(TraceFILE, zTracePrompt);
-}*/
 

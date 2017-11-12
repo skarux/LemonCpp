@@ -14,11 +14,8 @@
 
 %include_hpp
 {
-	#include <iostream>
+#include <iostream>
 }
-
-/* an extra parameter that will be available in each rule; it should be a pointer */
-%extra_argument{ std::string* translation_params }
 
 %syntax_error 
 {  
@@ -40,8 +37,11 @@
 %token_type{std::string*}
 
 /* Parser prefix; it will be added to both #define, class and function names */
-%name{MyParser}
+%name{Parser}
 
+/* Parser class name prefix: it will be added only in front of the class name;
+ * if it is omitted it will be substituted by "Lp" */
+%name_prefix{My}
 
 
 
@@ -56,7 +56,6 @@ newLineList ::= .
 newLineList ::= newLineList declaration(s5) .
 {
 	std::cout << "This is a non terminal value: " << *s5 << std::endl;
-	std::cout << "This is the extra parameter: " << *translation_params << std::endl;
 }
 
 declaration(sRet) ::= FIRST(s1) SECOND(s2) THIRD(s3) .
@@ -65,9 +64,7 @@ declaration(sRet) ::= FIRST(s1) SECOND(s2) THIRD(s3) .
 				<< "; S2: " << *s2 
 				<< "; S3:" 	<< *s3 
 				<< std::endl;
-				
-	std::cout << "This is the extra parameter: " << *translation_params << std::endl;
-	
+					
 	sRet = new std::string(*s1);
 	*sRet += " " + *s2 + " " + *s3;
 	
